@@ -61,6 +61,8 @@ abstract final class L10n {
       'پەیام نێردرا؛ دۆخی ئامێر تا وەڵامی کیت پشتڕاست نەکراوە';
   static const pwaSmsNote =
       'لە وێبدا پەیامەکە لە ئەپی SMS دەکرێتەوە. دەبێت خۆت Send لێ بدەیت. وەڵامی کیت لێرە وەرناگیرێت.';
+  static const composeOpened =
+      'Messages کرایەوە. تا Send لێ نەدەیت فەن ناگۆڕێت.';
   static const commandTimeout = 'کاتەکە تەواو بوو — وەڵامی کیت نەهات';
   static const unknown = 'دۆخەکە دیار نییە';
   static const emptyTitle = 'هێشتا پەیامێک نییە';

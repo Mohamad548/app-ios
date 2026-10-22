@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -109,6 +110,8 @@ class _FanCardState extends State<FanCard> {
                     label: _statusLabel,
                     color: accent,
                     busy: _busy,
+                    // Web only: keep R1–R4 aligned when Sorani labels change length.
+                    reserveWidth: kIsWeb ? 108 : null,
                   ),
                 ],
               ),
@@ -147,16 +150,19 @@ class _StatusChip extends StatelessWidget {
     required this.label,
     required this.color,
     required this.busy,
+    this.reserveWidth,
   });
 
   final String label;
   final Color color;
   final bool busy;
+  final double? reserveWidth;
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Container(
+      width: reserveWidth,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
@@ -164,7 +170,7 @@ class _StatusChip extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: reserveWidth == null ? MainAxisSize.min : MainAxisSize.max,
         children: [
           if (busy)
             SizedBox(
@@ -182,19 +188,33 @@ class _StatusChip extends StatelessWidget {
               decoration: BoxDecoration(shape: BoxShape.circle, color: color),
             ),
           const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 88),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: T.meta(p).copyWith(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+          if (reserveWidth == null)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 88),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: T.meta(p).copyWith(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: T.meta(p).copyWith(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

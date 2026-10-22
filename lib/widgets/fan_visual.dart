@@ -36,8 +36,7 @@ class _FanVisualState extends State<FanVisual> with TickerProviderStateMixin {
     duration: AppTheme.sending,
   );
 
-  bool get _on =>
-      widget.state == RelayUiState.on || widget.state == RelayUiState.awaiting;
+  bool get _on => widget.state == RelayUiState.on;
 
   bool get _busy =>
       widget.state == RelayUiState.sending ||

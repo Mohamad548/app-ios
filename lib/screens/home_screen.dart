@@ -385,14 +385,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
 
-      // Phone accepted the SMS (Android radio / iOS Send) or PWA opened Messages.
-      // Kit confirmation only arrives on Android inbox — do not fake it.
+      // Web/iOS only opened Messages. Send was not confirmed, so the fan stays.
+      if (SmsService.usesComposeSheet) {
+        setState(() {
+          d.ui = d.isOn ? RelayUiState.on : RelayUiState.off;
+        });
+        CommandLog.add(d.name, cmd, true, kind: LogKind.sent);
+        _toast(L10n.composeOpened);
+        return;
+      }
+
+      // Android: the radio accepted the SMS. Kit confirmation comes from inbox.
       setState(() => d.ui = RelayUiState.awaiting);
       CommandLog.add(d.name, cmd, true, kind: LogKind.sent);
       _armReplyTimeout(i);
-      if (SmsService.usesComposeSheet) {
-        _toast(L10n.pendingConfirm);
-      }
       if (!mounted) return;
       await showConfirmSheet(context, code: d.code);
     } on SmsError catch (e) {
@@ -471,10 +477,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           break;
         }
         if (mounted) {
-          setState(() => _devices[i].ui = RelayUiState.awaiting);
+          setState(() {
+            _devices[i].ui = SmsService.usesComposeSheet
+                ? (_devices[i].isOn ? RelayUiState.on : RelayUiState.off)
+                : RelayUiState.awaiting;
+          });
         }
         CommandLog.add(_devices[i].name, cmd, true);
-        _armReplyTimeout(i);
+        if (!SmsService.usesComposeSheet) _armReplyTimeout(i);
       } catch (_) {
         failed++;
         CommandLog.add(_devices[i].name, cmd, false, kind: LogKind.error);
@@ -490,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (cancelled) {
         _toast(L10n.smsCancelled);
       } else if (SmsService.usesComposeSheet && failed == 0) {
-        _toast(L10n.pendingConfirm);
+        _toast(L10n.composeOpened);
       } else {
         _toast(
           failed == 0 ? L10n.allOff : '${L10n.sendError} ($failed)',

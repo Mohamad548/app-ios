@@ -160,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await SmsService.send(phone, body, hide: _silent);
       CommandLog.add(L10n.testConnection, body, true);
       _snack(
-        SmsService.usesComposeSheet ? L10n.pendingConfirm : L10n.sent,
+        SmsService.usesComposeSheet ? L10n.composeOpened : L10n.sent,
       );
     } on ArgumentError {
       _snack(L10n.passwordHint, error: true);
