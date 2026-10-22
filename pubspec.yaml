@@ -1,0 +1,39 @@
+name: sim800_controller
+description: "SIM800L 4-channel SMS relay controller (Android + iOS + web preview)"
+publish_to: 'none'
+version: 1.0.3+4
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.5.3
+  # 2.5.0 crashes release APKs (R8/JNI NoSuchMethodError). Keep below 2.5.0.
+  shared_preferences_android: ">=2.4.28 <2.5.0"
+  flutter_svg: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/ckb.json
+    - assets/fans/dark/
+    - assets/fans/light/
+    - assets/fans/progress/
+    - assets/icons/
+    - assets/backgrounds/
+    - assets/brand/
+    - assets/illustrations/
+
+  fonts:
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-Variable.ttf

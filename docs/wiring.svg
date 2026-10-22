@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1420" height="880" viewBox="0 0 1420 880" font-family="Segoe UI, Tahoma, sans-serif">
+  <defs>
+    <style>
+      .box{fill:#ffffff;stroke:#243b53;stroke-width:2;rx:10}
+      .pwr{fill:#fff7e6;stroke:#d48806;stroke-width:2}
+      .mcu{fill:#e6f4ff;stroke:#0958d9;stroke-width:3}
+      .io{fill:#f0fdf4;stroke:#15803d;stroke-width:2}
+      .wire{fill:none;stroke:#2b4c6f;stroke-width:2}
+      .pwire{fill:none;stroke:#d48806;stroke-width:2.5;stroke-dasharray:8 5}
+      .t{font-size:16px;fill:#0f172a}
+      .tb{font-size:18px;font-weight:700;fill:#0f172a}
+      .s{font-size:13px;fill:#475569}
+      .lbl{font-size:13px;font-weight:600;fill:#1d4ed8}
+      .pw{font-size:13px;font-weight:700;fill:#b45309}
+      .fa{font-size:14px;fill:#334155;direction:rtl}
+    </style>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2b4c6f"/>
+    </marker>
+    <marker id="pa" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#d48806"/>
+    </marker>
+  </defs>
+
+  <rect width="1420" height="880" fill="#f8fafc"/>
+  <text x="40" y="46" class="tb" font-size="24">SIM800L 4-Relay SMS Controller — Wiring Block Diagram</text>
+  <text x="40" y="72" class="s">ATmega32A @16MHz · SIM800L · 128x64 KS0108 + 4-wire touch · 4x 12V relay</text>
+
+  <!-- ================= POWER ================= -->
+  <text x="40" y="120" class="tb" font-size="17">POWER</text>
+  <rect x="40" y="136" width="270" height="62" class="box pwr"/>
+  <text x="56" y="162" class="t">12V DC IN — 3A adapter</text>
+  <text x="56" y="184" class="s">fuse 3A + TVS + reverse-polarity FET</text>
+
+  <rect x="40" y="216" width="270" height="70" class="box pwr"/>
+  <text x="56" y="242" class="t">Buck #1  MP1584</text>
+  <text x="56" y="264" class="s">5.0V / 3A → MCU + GLCD + ULN</text>
+
+  <rect x="40" y="304" width="270" height="70" class="box pwr"/>
+  <text x="56" y="330" class="t">Buck #2  MP1584</text>
+  <text x="56" y="352" class="s">4.0V / 2A + 2200uF → SIM800L</text>
+
+  <rect x="40" y="392" width="270" height="62" class="box pwr"/>
+  <text x="56" y="418" class="t">12V rail</text>
+  <text x="56" y="440" class="s">4x relay coils via ULN2003 COM</text>
+
+  <path d="M175 198 L175 216" class="pwire" marker-end="url(#pa)"/>
+  <path d="M175 286 L175 304" class="pwire" marker-end="url(#pa)"/>
+  <path d="M175 374 L175 392" class="pwire" marker-end="url(#pa)"/>
+
+  <!-- ================= MCU ================= -->
+  <rect x="420" y="250" width="240" height="300" class="box mcu"/>
+  <text x="540" y="284" text-anchor="middle" class="tb" font-size="20">ATmega32A</text>
+  <text x="540" y="308" text-anchor="middle" class="s">16 MHz crystal · 5V</text>
+  <text x="540" y="330" text-anchor="middle" class="fa">پردازنده اصلی</text>
+
+  <!-- pin labels inside MCU -->
+  <text x="436" y="372" class="lbl">PORTB</text><text x="530" y="372" class="s">D0–D7 →GLCD</text>
+  <text x="436" y="402" class="lbl">PORTC</text><text x="530" y="402" class="s">CS1 CS2 RS EN RST BL</text>
+  <text x="436" y="432" class="lbl">PORTA</text><text x="530" y="432" class="s">A0–A3 → touch ADC</text>
+  <text x="436" y="462" class="lbl">PD0/PD1</text><text x="530" y="462" class="s">UART 9600</text>
+  <text x="436" y="492" class="lbl">PD2–PD5</text><text x="530" y="492" class="s">4x relay out</text>
+  <text x="436" y="522" class="lbl">PD6/PD7</text><text x="530" y="522" class="s">PWRKEY / buzzer</text>
+
+  <!-- ================= PERIPHERALS ================= -->
+  <!-- GLCD -->
+  <rect x="820" y="150" width="330" height="86" class="box io"/>
+  <text x="836" y="178" class="tb">GLCD 128x64 (KS0108)</text>
+  <text x="836" y="200" class="s">data: PB0–PB7 (100Ω series)</text>
+  <text x="836" y="220" class="s">ctrl: PC0–PC5 · R/W tied to GND</text>
+
+  <!-- TOUCH -->
+  <rect x="820" y="256" width="330" height="70" class="box io"/>
+  <text x="836" y="284" class="tb">4-wire resistive touch</text>
+  <text x="836" y="306" class="s">X+ PA0 · X− PA1 · Y+ PA2 · Y− PA3</text>
+
+  <!-- SIM800L -->
+  <rect x="820" y="346" width="330" height="96" class="box io"/>
+  <text x="836" y="374" class="tb">SIM800L (2G)</text>
+  <text x="836" y="396" class="s">TXD/RXD ↔ level shifter ↔ PD0/PD1</text>
+  <text x="836" y="416" class="s">PWRKEY ← BC817 ← PD6 · NETLIGHT → PC7</text>
+  <text x="836" y="436" class="s">VBAT ← 4.0V rail + 2200µF</text>
+
+  <!-- RELAYS -->
+  <rect x="820" y="462" width="330" height="96" class="box io"/>
+  <text x="836" y="490" class="tb">ULN2003A → 4x relay 12V</text>
+  <text x="836" y="512" class="s">PD2–PD5 → IN1–IN4 (100k pulldown)</text>
+  <text x="836" y="532" class="s">contacts NO/COM/NC · 7A 240VAC</text>
+  <text x="836" y="552" class="s">MOV 275V across NO–COM</text>
+
+  <!-- MISC -->
+  <rect x="820" y="578" width="330" height="70" class="box io"/>
+  <text x="836" y="606" class="tb">Buzzer + ISP header</text>
+  <text x="836" y="628" class="s">PD7 → BC337 · PB5/PB6/PB7 + RST</text>
+
+  <!-- wires MCU -> peripherals -->
+  <path d="M660 330 L740 330 L740 190 L820 190" class="wire" marker-end="url(#a)"/>
+  <path d="M660 380 L760 380 L760 290 L820 290" class="wire" marker-end="url(#a)"/>
+  <path d="M660 440 L790 440 L790 392 L820 392" class="wire" marker-end="url(#a)"/>
+  <path d="M660 490 L800 490 L800 508 L820 508" class="wire" marker-end="url(#a)"/>
+  <path d="M660 520 L780 520 L780 612 L820 612" class="wire" marker-end="url(#a)"/>
+
+  <!-- power rails to MCU and SIM -->
+  <path d="M310 250 L370 250 L370 268 L420 268" class="pwire" marker-end="url(#pa)"/>
+  <text x="318" y="242" class="pw">5.0V</text>
+  <path d="M310 338 L1200 338 L1200 380 L1150 380" class="pwire" marker-end="url(#pa)"/>
+  <text x="700" y="330" class="pw">4.0V to SIM800L VBAT</text>
+  <path d="M310 422 L1180 422 L1180 500 L1150 500" class="pwire" marker-end="url(#pa)"/>
+  <text x="700" y="414" class="pw">12V to relay coils</text>
+
+  <!-- ================= NOTES ================= -->
+  <rect x="40" y="500" width="330" height="190" rx="10" fill="#fffbe6" stroke="#d4b106" stroke-width="2"/>
+  <text x="60" y="530" class="tb" font-size="15">⚠ Critical rules</text>
+  <text x="60" y="558" class="fa">• SIM800L به ۴.۰ ولت و پیک ۲ آمپر نیاز دارد</text>
+  <text x="60" y="586" class="fa">• هرگز به ۵ ولت مستقیم یا LDO ضعیف وصل نشود</text>
+  <text x="60" y="614" class="fa">• خازن ۲۲۰۰µF کنار پایه VBAT الزامی است</text>
+  <text x="60" y="642" class="fa">• JTAG را در فیوز بیت‌ها خاموش کنید (PC2–PC5)</text>
+  <text x="60" y="670" class="fa">• سمت ۲۲۰V را فقط افراد مجرب سیم‌کشی کنند</text>
+
+  <!-- legend -->
+  <line x1="40" y1="730" x2="90" y2="730" class="wire"/>
+  <text x="100" y="735" class="s">signal</text>
+  <line x1="180" y1="730" x2="230" y2="730" class="pwire"/>
+  <text x="240" y="735" class="s">power rail</text>
+
+  <text x="40" y="790" class="s">Firmware: firmware/atmega32 · App: Flutter (android/ + ios/) · Protocol: docs/protocol.md</text>
+  <text x="40" y="816" class="s">Relay contact rating 7A/240VAC — keep ≥3mm creepage between mains and logic, 2mm trace width.</text>
+</svg>
