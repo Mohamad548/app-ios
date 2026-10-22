@@ -141,18 +141,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _phone.text.trim().isEmpty ? Store.phone : _phone.text.trim(),
     ).replaceAll(RegExp(r'[\s\-()]'), '');
     final pass = toAsciiDigits(_pass.text.trim());
-    if (!SmsService.demo && phone.isEmpty) {
+    if (phone.isEmpty) {
       _snack(L10n.phoneNumber, error: true);
       return;
     }
     setState(() => _testing = true);
-    if (SmsService.demo) {
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-      CommandLog.add(L10n.testConnection, 'STATUS…', true);
-      _snack('${L10n.sent} (DEMO)');
-      if (mounted) setState(() => _testing = false);
-      return;
-    }
     try {
       final has = await SmsService.hasPermission();
       if (!has) {
@@ -162,13 +155,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return;
         }
       }
-      await SmsService.send(
-        phone,
-        'STATUS${pass.isEmpty ? Store.password : pass}',
-        hide: _silent,
+      final pin = pass.isEmpty ? Store.password : pass;
+      final body = KitCommand.status(pin).body;
+      await SmsService.send(phone, body, hide: _silent);
+      CommandLog.add(L10n.testConnection, body, true);
+      _snack(
+        SmsService.usesComposeSheet ? L10n.pendingConfirm : L10n.sent,
       );
-      CommandLog.add(L10n.testConnection, 'STATUS…', true);
-      _snack(L10n.sent);
+    } on ArgumentError {
+      _snack(L10n.passwordHint, error: true);
     } catch (_) {
       CommandLog.add(L10n.testConnection, 'STATUS…', false);
       _snack(L10n.sendError, error: true);
@@ -330,7 +325,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             AppIcon('info', size: 22, color: p.txtDim),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(L10n.iosSmsNote, style: T.meta(p)),
+                              child: Text(
+                                SmsService.supportsInbox
+                                    ? L10n.iosSmsNote
+                                    : L10n.pwaSmsNote,
+                                style: T.meta(p),
+                              ),
                             ),
                           ],
                         ),

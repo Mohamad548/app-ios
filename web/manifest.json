@@ -1,11 +1,12 @@
 {
-    "name": "sim800_controller",
-    "short_name": "sim800_controller",
+    "name": "SIM800 Control",
+    "short_name": "SIM800",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#070B14",
+    "theme_color": "#070B14",
+    "description": "Control the SIM800 kit by SMS. No server. Add to Home Screen; sending opens Messages.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.provider.Telephony
+import android.app.PendingIntent
 import android.telephony.SmsManager
 import android.telephony.SmsMessage
 import androidx.core.app.ActivityCompat
@@ -28,7 +29,10 @@ class MainActivity : FlutterActivity() {
     private val methodChannelName = "sim800/sms"
     private val eventChannelName = "sim800/sms_inbox"
     private val smsRequestCode = 4711
+    private val sentAction = "com.bakhtor.sim800_controller.SMS_SENT"
     private var pendingResult: MethodChannel.Result? = null
+    private var sendResult: MethodChannel.Result? = null
+    private var sentReceiver: BroadcastReceiver? = null
     private var eventSink: EventChannel.EventSink? = null
     private var smsReceiver: BroadcastReceiver? = null
 
@@ -126,9 +130,7 @@ class MainActivity : FlutterActivity() {
                                 result.error("PERMISSION", "SEND_SMS not granted", null)
 
                             else -> try {
-                                sendSms(number, message)
-                                if (hide) deleteSentBestEffort(number, message)
-                                result.success(true)
+                                sendSms(number, message, hide, result)
                             } catch (t: Throwable) {
                                 result.error("SEND_FAILED", t.message ?: "unknown", null)
                             }
@@ -198,18 +200,60 @@ class MainActivity : FlutterActivity() {
     }
 
     @Suppress("DEPRECATION")
-    private fun sendSms(number: String, message: String) {
+    private fun sendSms(
+        number: String,
+        message: String,
+        hide: Boolean,
+        result: MethodChannel.Result
+    ) {
+        if (sendResult != null) {
+            result.error("BUSY", "another SMS is still sending", null)
+            return
+        }
+        sendResult = result
         val manager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             getSystemService(SmsManager::class.java) ?: SmsManager.getDefault()
         } else {
             SmsManager.getDefault()
         }
-        val parts = manager.divideMessage(message)
-        if (parts.size <= 1) {
-            manager.sendTextMessage(number, null, message, null, null)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         } else {
-            manager.sendMultipartTextMessage(number, null, parts, null, null)
+            PendingIntent.FLAG_UPDATE_CURRENT
         }
+        val sentIntent = PendingIntent.getBroadcast(
+            this,
+            0,
+            Intent(sentAction).setPackage(packageName),
+            flags
+        )
+        if (sentReceiver == null) {
+            sentReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    val code = resultCode
+                    val pending = sendResult
+                    sendResult = null
+                    if (code == android.app.Activity.RESULT_OK) {
+                        if (hide) deleteSentBestEffort(number, message)
+                        pending?.success(true)
+                    } else {
+                        pending?.error(
+                            "SEND_FAILED",
+                            "radio result $code",
+                            null
+                        )
+                    }
+                }
+            }
+            val filter = IntentFilter(sentAction)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(sentReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(sentReceiver, filter)
+            }
+        }
+        // Protocol bodies are short ASCII; single-part is the normal path.
+        manager.sendTextMessage(number, null, message, sentIntent, null)
     }
 
     /** Best-effort: many OEMs still log the SMS; full hide needs default-SMS role. */
@@ -247,6 +291,13 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         unregisterSmsReceiver()
+        sentReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (_: Throwable) {
+            }
+        }
+        sentReceiver = null
         super.onDestroy()
     }
 

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../l10n.dart';
 import '../models.dart';
 import '../sms_service.dart';
-import '../status_parser.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets/app_icon.dart';
@@ -31,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _syncing = false;
   DateTime? _lastReply;
   StreamSubscription<IncomingSms>? _inboxSub;
+  final CommandGate _gate = CommandGate();
+  final Map<int, Timer> _replyTimers = <int, Timer>{};
 
   @override
   void initState() {
@@ -49,6 +50,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _inboxSub?.cancel();
+    for (final t in _replyTimers.values) {
+      t.cancel();
+    }
     super.dispose();
   }
 
@@ -84,32 +88,82 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _listenInbox() {
     _inboxSub?.cancel();
+    // iOS and PWA never get an inbox. Do not invent replies.
+    if (!SmsService.supportsInbox) return;
     _inboxSub = SmsService.inbox.listen((sms) {
-      final parsed = parseRelayStatus(sms.body);
-      if (parsed == null) {
-        if (looksLikeKitReply(sms.body)) {
-          CommandLog.add(L10n.reply, sms.body, true, kind: LogKind.reply);
-        }
+      if (Store.phone.isNotEmpty && !samePhone(sms.from, Store.phone)) {
         return;
       }
+      final ack = parseKitAck(sms.body);
+      if (ack == null) return;
       if (!mounted) return;
-      setState(() {
-        for (var i = 0; i < 4; i++) {
-          _devices[i].isOn = parsed[i];
-          _devices[i].ui =
-              parsed[i] ? RelayUiState.on : RelayUiState.off;
+
+      if (ack.kind == KitAckKind.passError ||
+          ack.kind == KitAckKind.unknownCmd) {
+        setState(() {
+          for (final d in _devices) {
+            if (d.ui == RelayUiState.awaiting || d.ui == RelayUiState.sending) {
+              d.ui = RelayUiState.error;
+            }
+          }
+          _syncing = false;
+        });
+        for (final t in _replyTimers.values) {
+          t.cancel();
         }
-        _lastReply = DateTime.now();
-        _syncing = false;
-      });
-      _persistStates();
-      CommandLog.add(L10n.reply, sms.body, true, kind: LogKind.reply);
+        _replyTimers.clear();
+        CommandLog.add(L10n.reply, sms.body, false, kind: LogKind.error);
+        _toast(L10n.sendError, error: true);
+        return;
+      }
+
+      final snap = ack.snapshot;
+      if (snap != null) {
+        setState(() {
+          for (var i = 0; i < 4; i++) {
+            _devices[i].isOn = snap[i];
+            _devices[i].ui = snap[i] ? RelayUiState.on : RelayUiState.off;
+            _replyTimers.remove(i)?.cancel();
+          }
+          _lastReply = DateTime.now();
+          _syncing = false;
+        });
+        _persistStates();
+        CommandLog.add(L10n.reply, sms.body, true, kind: LogKind.reply);
+        return;
+      }
+
+      final idx = ack.relayIndex;
+      if (idx != null &&
+          (ack.kind == KitAckKind.on || ack.kind == KitAckKind.off)) {
+        final on = ack.kind == KitAckKind.on;
+        setState(() {
+          _devices[idx].isOn = on;
+          _devices[idx].ui = on ? RelayUiState.on : RelayUiState.off;
+          _lastReply = DateTime.now();
+        });
+        _replyTimers.remove(idx)?.cancel();
+        _persistStates();
+        CommandLog.add(L10n.reply, sms.body, true, kind: LogKind.reply);
+      }
     });
   }
 
-  /// Send STATUS+PIN so firmware replies `R1=… R4=…`. Falls back to cache.
+  void _armReplyTimeout(int index) {
+    if (!SmsService.supportsInbox) return;
+    _replyTimers.remove(index)?.cancel();
+    _replyTimers[index] = Timer(kitReplyTimeout, () {
+      if (!mounted) return;
+      final d = _devices[index];
+      if (d.ui != RelayUiState.awaiting) return;
+      setState(() => d.ui = RelayUiState.error);
+      _toast(L10n.commandTimeout, error: true);
+    });
+  }
+
+  /// Send STATUS+PIN so firmware replies `R1=… R4=…`. Android inbox only.
   Future<void> _syncFromKit() async {
-    if (SmsService.demo || Store.phone.isEmpty) return;
+    if (!SmsService.supportsBackgroundSync || Store.phone.isEmpty) return;
     if (_syncing) return;
     final canSend = await SmsService.hasPermission();
     if (!canSend || !mounted) return;
@@ -153,7 +207,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Android: explain → system Allow/Deny.
   /// iOS: Messages compose needs no runtime permission; only canSendText.
   Future<bool> _ensureSmsPermission() async {
-    if (SmsService.demo) return true;
     if (await SmsService.hasPermission()) {
       if (mounted) setState(() => _hasPerm = true);
       return true;
@@ -290,39 +343,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final d = _devices[i];
     if (d.ui == RelayUiState.sending || d.ui == RelayUiState.awaiting) return;
 
-    if (!SmsService.demo) {
-      if (Store.phone.isEmpty) {
-        _toast(L10n.setupNeeded);
-        final ok = await _openSettings();
-        if (!ok || Store.phone.isEmpty) return;
-      }
-      final smsOk = await _ensureSmsPermission();
-      if (!smsOk) {
-        _toast(L10n.smsDeniedTitle, error: true);
-        return;
-      }
+    if (Store.phone.isEmpty) {
+      _toast(L10n.setupNeeded);
+      final ok = await _openSettings();
+      if (!ok || Store.phone.isEmpty) return;
+    }
+    final smsOk = await _ensureSmsPermission();
+    if (!smsOk) {
+      _toast(L10n.smsDeniedTitle, error: true);
+      return;
     }
 
     final target = !d.isOn;
-    final cmd = '${d.code}${target ? 'EN' : 'DS'}${Store.password}';
+    final KitCommand built;
+    try {
+      built = KitCommand.relay(
+        index: d.index,
+        enable: target,
+        pin: Store.password,
+      );
+    } on ArgumentError {
+      _toast(L10n.passwordHint, error: true);
+      return;
+    }
+    final cmd = built.body;
+    if (!_gate.tryAcquire(cmd)) return;
     final previous = d.ui;
 
     setState(() => d.ui = RelayUiState.sending);
-
-    if (SmsService.demo) {
-      await Future<void>.delayed(const Duration(milliseconds: 650));
-      if (!mounted) return;
-      setState(() {
-        d.isOn = target;
-        d.ui = target ? RelayUiState.on : RelayUiState.off;
-        _lastReply = DateTime.now();
-      });
-      await _persistStates();
-      CommandLog.add(d.name, cmd, true);
-      if (!mounted) return;
-      await showConfirmSheet(context, code: d.code);
-      return;
-    }
 
     try {
       final ok = await SmsService.send(
@@ -332,25 +380,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
       if (!mounted) return;
       if (!ok) {
-        // User cancelled the iOS Messages sheet (or send aborted).
         setState(() => d.ui = previous);
         _toast(L10n.smsCancelled);
         return;
       }
 
+      // Phone accepted the SMS (Android radio / iOS Send) or PWA opened Messages.
+      // Kit confirmation only arrives on Android inbox — do not fake it.
       setState(() => d.ui = RelayUiState.awaiting);
       CommandLog.add(d.name, cmd, true, kind: LogKind.sent);
+      _armReplyTimeout(i);
+      if (SmsService.usesComposeSheet) {
+        _toast(L10n.pendingConfirm);
+      }
       if (!mounted) return;
       await showConfirmSheet(context, code: d.code);
-
-      // Optimistic local state; kit reply (if RECEIVE_SMS) can refine it.
+    } on SmsError catch (e) {
       if (!mounted) return;
-      setState(() {
-        d.isOn = target;
-        d.ui = target ? RelayUiState.on : RelayUiState.off;
-        _lastReply = DateTime.now();
-      });
-      await _persistStates();
+      setState(() => d.ui = RelayUiState.error);
+      CommandLog.add(d.name, '$cmd · $e', false, kind: LogKind.error);
+      _toast(L10n.sendError, error: true);
     } catch (_) {
       if (!mounted) return;
       setState(() => d.ui = previous == RelayUiState.unknown
@@ -358,21 +407,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           : previous);
       CommandLog.add(d.name, cmd, false, kind: LogKind.error);
       _toast(L10n.sendError, error: true);
+    } finally {
+      _gate.release();
     }
   }
 
   Future<void> _allOff() async {
     if (_busyAll) return;
-    if (!SmsService.demo && Store.phone.isEmpty) {
+    if (Store.phone.isEmpty) {
       await _openSettings();
       return;
     }
-    if (!SmsService.demo) {
-      final smsOk = await _ensureSmsPermission();
-      if (!smsOk) {
-        _toast(L10n.smsDeniedTitle, error: true);
-        return;
-      }
+    final smsOk = await _ensureSmsPermission();
+    if (!smsOk) {
+      _toast(L10n.smsDeniedTitle, error: true);
+      return;
     }
 
     final targets = <int>[
@@ -394,66 +443,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     var failed = 0;
     var cancelled = false;
     for (final i in targets) {
-      final cmd = '${_devices[i].code}DS${Store.password}';
-      if (SmsService.demo) {
-        await Future<void>.delayed(const Duration(milliseconds: 350));
-        if (mounted) {
-          setState(() {
-            _devices[i].isOn = false;
-            _devices[i].ui = RelayUiState.off;
-          });
-        }
-        CommandLog.add(_devices[i].name, cmd, true);
-      } else {
-        try {
-          final ok = await SmsService.send(
-            Store.phone,
-            cmd,
-            hide: Store.silent,
-          );
-          if (!ok) {
-            cancelled = true;
-            if (mounted) {
-              setState(() {
-                _devices[i].ui =
-                    _devices[i].isOn ? RelayUiState.on : RelayUiState.off;
-              });
-            }
-            break;
-          }
+      late final String cmd;
+      try {
+        cmd = KitCommand.relay(
+          index: _devices[i].index,
+          enable: false,
+          pin: Store.password,
+        ).body;
+      } on ArgumentError {
+        failed++;
+        continue;
+      }
+      try {
+        final ok = await SmsService.send(
+          Store.phone,
+          cmd,
+          hide: Store.silent,
+        );
+        if (!ok) {
+          cancelled = true;
           if (mounted) {
             setState(() {
-              _devices[i].isOn = false;
-              _devices[i].ui = RelayUiState.off;
+              _devices[i].ui =
+                  _devices[i].isOn ? RelayUiState.on : RelayUiState.off;
             });
           }
-          CommandLog.add(_devices[i].name, cmd, true);
-        } catch (_) {
-          failed++;
-          CommandLog.add(_devices[i].name, cmd, false, kind: LogKind.error);
-          if (mounted) {
-            setState(() => _devices[i].ui = RelayUiState.error);
-          }
+          break;
         }
-        if (!SmsService.usesComposeSheet) {
-          await Future<void>.delayed(const Duration(milliseconds: 320));
+        if (mounted) {
+          setState(() => _devices[i].ui = RelayUiState.awaiting);
+        }
+        CommandLog.add(_devices[i].name, cmd, true);
+        _armReplyTimeout(i);
+      } catch (_) {
+        failed++;
+        CommandLog.add(_devices[i].name, cmd, false, kind: LogKind.error);
+        if (mounted) {
+          setState(() => _devices[i].ui = RelayUiState.error);
         }
       }
+      await Future<void>.delayed(commandGap);
     }
 
     if (mounted) {
-      setState(() {
-        _busyAll = false;
-        if (!cancelled) _lastReply = DateTime.now();
-        for (final d in _devices) {
-          if (d.ui == RelayUiState.sending) {
-            d.ui = d.isOn ? RelayUiState.on : RelayUiState.off;
-          }
-        }
-      });
-      await _persistStates();
+      setState(() => _busyAll = false);
       if (cancelled) {
         _toast(L10n.smsCancelled);
+      } else if (SmsService.usesComposeSheet && failed == 0) {
+        _toast(L10n.pendingConfirm);
       } else {
         _toast(
           failed == 0 ? L10n.allOff : '${L10n.sendError} ($failed)',
@@ -479,7 +516,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Column(
             children: [
               _header(p, configured),
-              if (!configured && !SmsService.demo) _setupBanner(p),
+              if (!configured) _setupBanner(p),
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpace.gutter,
@@ -590,7 +627,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           SignalPill(
             available: configured && _hasPerm,
-            demo: SmsService.demo,
+            demo: SmsService.usesComposeSheet && !SmsService.supportsInbox,
           ),
         ],
       ),

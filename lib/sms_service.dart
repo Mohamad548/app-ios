@@ -1,142 +1,57 @@
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'models.dart';
+import 'sms/native_sms_transport.dart';
+import 'sms/sms_transport.dart';
+import 'sms/web_sms_transport.dart';
 
-class IncomingSms {
-  IncomingSms({required this.from, required this.body});
-  final String from;
-  final String body;
-}
+export 'sms/protocol.dart';
+export 'sms/sms_transport.dart' show IncomingSms, SmsError, SmsPlatformKind;
 
-/// Bridge to native SMS:
-/// - Android: SmsManager (silent send when permitted)
-/// - iOS: MFMessageComposeViewController (user taps Send in Messages)
+/// Facade over [SmsTransport]. Android/iOS use the native channel;
+/// web/PWA uses `sms:` links. Inbox is never faked on iOS or web.
 class SmsService {
   SmsService._();
 
-  static const MethodChannel _ch = MethodChannel('sim800/sms');
-  static const EventChannel _inbox = EventChannel('sim800/sms_inbox');
+  static SmsTransport? _override;
 
-  static bool get demo => kIsWeb;
-
-  /// iOS shows the system Messages sheet; command text is visible.
-  static bool get usesComposeSheet =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
-
-  /// Auto STATUS sync would pop Messages on every resume — only Android.
-  static bool get supportsBackgroundSync => !demo && !usesComposeSheet;
-
-  /// Inbox STATUS replies only work on Android with RECEIVE_SMS.
-  static bool get supportsInbox => !demo && !usesComposeSheet;
-
-  static Stream<IncomingSms> get inbox {
-    if (demo || !supportsInbox) return const Stream.empty();
-    return _inbox.receiveBroadcastStream().map((raw) {
-      final map = Map<String, dynamic>.from(raw as Map);
-      return IncomingSms(
-        from: '${map['from'] ?? ''}',
-        body: '${map['body'] ?? ''}',
-      );
-    });
+  /// Tests inject a fake transport.
+  static void debugSetTransport(SmsTransport? transport) {
+    _override = transport;
   }
 
-  static Future<bool> hasPermission() async {
-    if (demo) return true;
-    try {
-      return await _ch.invokeMethod<bool>('canSend') ?? false;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  static SmsTransport get transport =>
+      _override ?? (kIsWeb ? WebSmsTransport() : NativeSmsTransport());
 
-  static Future<bool> canReceive() async {
-    if (demo || !supportsInbox) return false;
-    try {
-      return await _ch.invokeMethod<bool>('canReceive') ?? false;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  static bool get demo => false;
 
-  static Future<bool> shouldShowRationale() async {
-    if (demo || usesComposeSheet) return false;
-    try {
-      return await _ch.invokeMethod<bool>('shouldShowRationale') ?? false;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  static bool get usesComposeSheet => transport.usesComposeSheet;
 
-  static Future<bool> requestPermission() async {
-    if (demo) return true;
-    try {
-      return await _ch.invokeMethod<bool>('requestPermission') ?? false;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  static bool get supportsBackgroundSync => transport.supportsBackgroundSync;
 
-  static Future<bool> requestReceivePermission() async {
-    if (demo || !supportsInbox) return false;
-    try {
-      return await _ch.invokeMethod<bool>('requestReceivePermission') ?? false;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  static bool get supportsInbox => transport.supportsInbox;
 
-  static Future<void> openAppSettings() async {
-    if (demo) return;
-    try {
-      await _ch.invokeMethod<bool>('openAppSettings');
-    } on PlatformException {
-      // ignore
-    } on MissingPluginException {
-      // ignore
-    }
-  }
+  static Stream<IncomingSms> get inbox => transport.inbox;
 
-  /// Returns `true` if sent, `false` if user cancelled the compose sheet.
+  static Future<bool> hasPermission() => transport.hasPermission();
+
+  static Future<bool> canReceive() => transport.canReceive();
+
+  static Future<bool> shouldShowRationale() => transport.shouldShowRationale();
+
+  static Future<bool> requestPermission() => transport.requestPermission();
+
+  static Future<bool> requestReceivePermission() =>
+      transport.requestReceivePermission();
+
+  static Future<void> openAppSettings() => transport.openAppSettings();
+
   static Future<bool> send(
     String number,
     String message, {
     bool hide = true,
-  }) async {
-    if (demo) return true;
-    try {
-      final ok = await _ch.invokeMethod<bool>('send', {
-        'number': number,
-        'message': message,
-        // iOS always shows Messages; hide is Android-only best-effort.
-        'hide': usesComposeSheet ? false : hide,
-      });
-      return ok ?? false;
-    } on PlatformException catch (e) {
-      throw SmsError(e.message ?? 'send failed (${e.code})');
-    } on MissingPluginException {
-      throw const SmsError('native channel unavailable');
-    }
-  }
-}
-
-class SmsError implements Exception {
-  const SmsError(this.message);
-  final String message;
-
-  @override
-  String toString() => message;
+  }) =>
+      transport.send(number, message, hide: hide);
 }
 
 class CommandLog {

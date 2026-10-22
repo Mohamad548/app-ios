@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#070B14" />
+  <title>SIM800 Control — Web DEMO</title>
+  <link rel="stylesheet" href="kit/tokens/tokens.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="aurora" aria-hidden="true">
+      <img class="aurora-base" src="kit/backgrounds/dark-base.webp" alt="" />
+      <img class="aurora-glow" src="kit/backgrounds/dark-aurora.webp" alt="" />
+    </div>
+
+    <!-- SPLASH -->
+    <section id="view-splash" class="view active">
+      <div class="splash-center">
+        <div class="splash-mark">
+          <img class="ring" src="kit/brand/luminous-ring.webp" alt="" />
+          <img class="glyph" src="kit/brand/relay-glyph.webp" alt="" />
+        </div>
+        <h1 class="welcome" data-i18n="welcome">بەخێربێی کاک بەختوور</h1>
+        <p class="subtitle" data-i18n="subtitle">کۆنترۆڵی چوار ئامێر بە پەیام</p>
+        <span class="demo-chip">DEMO · بێ SMSی واقعی</span>
+        <button type="button" class="btn btn-primary" id="btn-enter" data-i18n="lets_go">دەبا بڕۆین</button>
+      </div>
+    </section>
+
+    <!-- HOME -->
+    <section id="view-home" class="view">
+      <header class="home-header">
+        <div class="greet-row">
+          <img class="app-mark" src="kit/brand/app-mark.webp" alt="" />
+          <div class="greet-text">
+            <p class="hello" data-i18n="hello">سڵاو</p>
+            <p class="meta" id="home-meta">٠ لە ٤</p>
+          </div>
+          <div class="signal-pill" id="signal-pill">
+            <img src="kit/icons/svg/signal.svg" class="ico" alt="" />
+            <span>DEMO</span>
+          </div>
+        </div>
+        <div class="section-row">
+          <h3 data-i18n="devices">ئامێرەکان</h3>
+          <button type="button" class="text-link" id="btn-open-log">
+            <img src="kit/icons/svg/history.svg" class="ico" alt="" />
+            <span data-i18n="log">تۆمار</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="setup-banner glass" id="setup-banner" hidden role="button" tabindex="0">
+        <img src="kit/icons/svg/info.svg" class="ico amber" alt="" />
+        <span data-i18n="setup_needed">ژمارەی کیت ڕێک نەخراوە — کلیک بکە</span>
+        <img src="kit/icons/svg/chevron-left.svg" class="ico amber" alt="" />
+      </div>
+
+      <div class="fan-grid" id="fan-grid"></div>
+
+      <p class="last-reply" id="last-reply" hidden></p>
+
+      <footer class="home-footer">
+        <button type="button" class="settings-tile" id="btn-open-settings">
+          <img src="kit/icons/svg/settings.svg" class="ico" alt="" />
+          <span data-i18n="settings">ڕێکخستن</span>
+        </button>
+        <button type="button" class="btn btn-primary btn-alloff" id="btn-all-off">
+          <img src="kit/icons/svg/power.svg" class="ico dark" alt="" />
+          <span data-i18n="all_off">هەموو خاموش</span>
+        </button>
+      </footer>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view">
+      <header class="page-header">
+        <button type="button" class="icon-hit" id="btn-settings-back" aria-label="back">
+          <img src="kit/icons/svg/back-rtl.svg" class="ico" alt="" />
+        </button>
+        <h2 data-i18n="settings">ڕێکخستن</h2>
+        <span class="spacer"></span>
+      </header>
+
+      <div class="settings-stack">
+        <div class="glass group">
+          <h3 class="group-title" data-i18n="connection">پەیوەندی</h3>
+          <label class="settings-row">
+            <span class="row-start">
+              <img src="kit/icons/svg/phone.svg" class="ico" alt="" />
+              <span data-i18n="phone_number">ژمارەی مۆبایل</span>
+            </span>
+            <input id="set-phone" type="tel" dir="ltr" placeholder="+964…" />
+          </label>
+          <label class="settings-row">
+            <span class="row-start">
+              <img src="kit/icons/svg/lock.svg" class="ico" alt="" />
+              <span data-i18n="password">وشەی نهێنی</span>
+            </span>
+            <span class="row-end">
+              <input id="set-pin" type="password" maxlength="4" dir="ltr" />
+              <button type="button" class="icon-hit sm" id="btn-toggle-pin" aria-label="eye">
+                <img src="kit/icons/svg/eye.svg" class="ico" id="pin-eye" alt="" />
+              </button>
+            </span>
+          </label>
+        </div>
+
+        <div class="glass group">
+          <h3 class="group-title" data-i18n="device_names">ناوی ئامێرەکان</h3>
+          <div id="name-rows"></div>
+        </div>
+
+        <div class="glass group row-between">
+          <div class="row-start col">
+            <span class="row-start">
+              <img src="kit/icons/svg/mute.svg" class="ico" alt="" />
+              <span data-i18n="silent_send">ناردنی بێدەنگ</span>
+            </span>
+            <small class="muted" data-i18n="silent_helper">ناردنی SMS بەبێ دەنگ</small>
+          </div>
+          <button type="button" class="switch on" id="btn-silent" aria-pressed="true"></button>
+        </div>
+
+        <button type="button" class="glass settings-row hit" id="btn-test">
+          <span class="row-start">
+            <img src="kit/icons/svg/antenna.svg" class="ico" alt="" />
+            <span data-i18n="test_connection">تاقیکردنەوە</span>
+          </span>
+          <span class="row-end muted">SMS · فیک</span>
+          <img src="kit/icons/svg/chevron-left.svg" class="ico" alt="" />
+        </button>
+
+        <p class="demo-note">⚠️ نسخه وب فقط برای تست مشتری است — پیامک واقعی ارسال نمی‌شود.</p>
+        <button type="button" class="btn btn-primary" id="btn-settings-save" data-i18n="save">پاشەکەوتکردن</button>
+      </div>
+    </section>
+
+    <!-- LOG -->
+    <section id="view-log" class="view">
+      <header class="page-header">
+        <button type="button" class="icon-hit" id="btn-log-back" aria-label="back">
+          <img src="kit/icons/svg/back-rtl.svg" class="ico" alt="" />
+        </button>
+        <h2 data-i18n="log">تۆمار</h2>
+        <button type="button" class="text-link" id="btn-clear-log">سڕینەوە</button>
+      </header>
+
+      <div class="filter-bar" id="log-filters">
+        <button type="button" class="chip active" data-filter="all" data-i18n="all">ھەموو</button>
+        <button type="button" class="chip" data-filter="sent" data-i18n="sent">نێردرا</button>
+        <button type="button" class="chip" data-filter="error" data-i18n="filter_error">ھەڵە</button>
+      </div>
+
+      <ul class="log-list" id="log-list"></ul>
+
+      <div class="empty-log" id="empty-log">
+        <img src="kit/illustrations/empty-log.webp" alt="" />
+        <h3 data-i18n="empty_title">هێشتا پەیامێک نییە</h3>
+        <p data-i18n="empty_body">پەیامەکان لێرە دەردەکەون</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-card glass">
+      <img src="kit/icons/svg/check-circle.svg" class="ico tech" alt="" />
+      <p id="sheet-text">نێردرا</p>
+      <div class="progress-track"><i id="sheet-bar"></i></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

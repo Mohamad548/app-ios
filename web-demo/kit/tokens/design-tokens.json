@@ -1,0 +1,97 @@
+{
+  "color": {
+    "dark": {
+      "bg": "#070B14",
+      "end": "#0E1626",
+      "surface": "#141E2F",
+      "border": "#FFFFFF",
+      "text": "#E6EDF7",
+      "muted": "#93A4BD",
+      "tech": "#22D3EE",
+      "on": "#F59E0B"
+    },
+    "light": {
+      "bg": "#F3F6FA",
+      "end": "#E8EFF7",
+      "surface": "#FFFFFF",
+      "border": "#D7E1EC",
+      "text": "#152238",
+      "muted": "#53657D",
+      "tech": "#087F91",
+      "on": "#B76A06"
+    }
+  },
+  "danger": "#F43F5E",
+  "font": {
+    "family": "Vazirmatn",
+    "weights": [
+      400,
+      500,
+      600
+    ],
+    "units": "sp",
+    "roles": {
+      "welcome": [
+        28,
+        600,
+        40
+      ],
+      "title": [
+        24,
+        600,
+        34
+      ],
+      "device": [
+        20,
+        600,
+        28
+      ],
+      "body": [
+        16,
+        400,
+        24
+      ],
+      "button": [
+        16,
+        600,
+        24
+      ],
+      "metadata": [
+        13,
+        400,
+        20
+      ]
+    }
+  },
+  "spacing": [
+    8,
+    16,
+    24,
+    32,
+    40,
+    48
+  ],
+  "radius": {
+    "card": 24,
+    "sheet": 28,
+    "button": 24,
+    "pill": 999
+  },
+  "icon": {
+    "size": 24,
+    "stroke": 1.5
+  },
+  "touchTarget": 48,
+  "motion": {
+    "splashRingMs": 600,
+    "splashGlyphMs": 300,
+    "splashTextMs": 300,
+    "toggleMs": 240,
+    "fanRotationMs": 1800,
+    "pulseMs": 2400,
+    "sendingMs": 1000,
+    "dismissMs": 3000,
+    "standardEasing": "cubic-bezier(0.2,0,0,1)",
+    "splashEasing": "cubic-bezier(0.22,1,0.36,1)"
+  }
+}

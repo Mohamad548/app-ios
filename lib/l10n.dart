@@ -57,6 +57,11 @@ abstract final class L10n {
   static const reply = 'وەڵام';
   static const sending = 'لە ناردندایە';
   static const awaitingReply = 'چاوەڕێی وەڵامی ئامێر';
+  static const pendingConfirm =
+      'پەیام نێردرا؛ دۆخی ئامێر تا وەڵامی کیت پشتڕاست نەکراوە';
+  static const pwaSmsNote =
+      'لە وێبدا پەیامەکە لە ئەپی SMS دەکرێتەوە. دەبێت خۆت Send لێ بدەیت. وەڵامی کیت لێرە وەرناگیرێت.';
+  static const commandTimeout = 'کاتەکە تەواو بوو — وەڵامی کیت نەهات';
   static const unknown = 'دۆخەکە دیار نییە';
   static const emptyTitle = 'هێشتا پەیامێک نییە';
   static const emptyBody = 'پەیامەکان لێرە دەردەکەون';
